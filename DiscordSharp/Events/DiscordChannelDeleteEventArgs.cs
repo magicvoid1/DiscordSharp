@@ -6,8 +6,13 @@ using System.Threading.Tasks;
 
 namespace DiscordSharp.Events
 {
-    public class DiscordChannelDeleteEventArgs
+    public class DiscordChannelDeleteEventArgs : EventArgs
     {
         public DiscordChannel ChannelDeleted { get; internal set; }
+    }
+
+    public class DiscordPrivateChannelDeleteEventArgs : EventArgs
+    {
+        public DiscordPrivateChannel PrivateChannelDeleted { get; internal set; }
     }
 }

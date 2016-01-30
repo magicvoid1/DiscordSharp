@@ -6,21 +6,39 @@ using System.Drawing;
 
 namespace DiscordSharp
 {
-    public class DiscordChannel
+    public class DiscordChannelBase
+    {
+        [JsonProperty("id")]
+        public string id { get; internal set; }
+        [JsonProperty("is_private")]
+        public bool is_private { get; internal set; }
+    }
+
+    public class DiscordChannel : DiscordChannelBase
     {
         public string type { get; set; }
         public string name { get; set; }
-        public string id { get; set; }
         public string topic { get; set; }
-        public bool is_private { get; set; } = false;
         public List<DiscordPermissionOverride> PermissionOverrides { get; set; }
 
         public DiscordServer parent { get; internal set; }
 
-        public void SendMessage(string message)
+        public DiscordMessage SendMessage(string message)
         {
             string url = Endpoints.BaseAPI + Endpoints.Channels + $"/{id}" + Endpoints.Messages;
-            WebWrapper.Post(url, DiscordClient.token, JsonConvert.SerializeObject(Utils.GenerateMessage(message)));
+            JObject result = JObject.Parse(WebWrapper.Post(url, DiscordClient.token, JsonConvert.SerializeObject(Utils.GenerateMessage(message))));
+
+            DiscordMessage m = new DiscordMessage
+            {
+                id = result["id"].ToString(),
+                attachments = result["attachments"].ToObject<string[]>(),
+                author = this.parent.members.Find(x => x.ID == result["author"]["id"].ToString()),
+                channel = this,
+                content = result["content"].ToString(),
+                RawJson = result,
+                timestamp = result["timestamp"].ToObject<DateTime>()
+            };
+            return m;
         }
 
         private void DeleteMessage(DiscordMessage message)
@@ -30,10 +48,11 @@ namespace DiscordSharp
         }
     }
 
-    public class DiscordPrivateChannel
+    public class DiscordPrivateChannel : DiscordChannelBase
     {
-        public string id { get; set; }
-        public DiscordRecipient recipient { get; set; }
+        public DiscordMember recipient { get; set; }
+        [JsonProperty("last_message_id")]
+        private string LastMessageID { get; set; }
     }
 
     //kinda like the author
@@ -104,13 +123,13 @@ namespace DiscordSharp
 
         public void AssignRoleToMember(DiscordRole role, DiscordMember member)
         {
-            string url = Endpoints.BaseAPI + Endpoints.Guilds + $"/{this.id}" + Endpoints.Members + $"/{member.user.id}";
+            string url = Endpoints.BaseAPI + Endpoints.Guilds + $"/{this.id}" + Endpoints.Members + $"/{member.ID}";
             string message = JsonConvert.SerializeObject(new { roles = new string[] { role.id } });
             Console.WriteLine(WebWrapper.Patch(url, DiscordClient.token, message));
         }
         public void AssignRoleToMember(List<DiscordRole> roles, DiscordMember member)
         {
-            string url = Endpoints.BaseAPI + Endpoints.Guilds + $"/{this.id}" + Endpoints.Members + $"/{member.user.id}";
+            string url = Endpoints.BaseAPI + Endpoints.Guilds + $"/{this.id}" + Endpoints.Members + $"/{member.ID}";
             List<string> rolesAsIds = new List<string>();
             roles.ForEach(x => rolesAsIds.Add(x.id));
             string message = JsonConvert.SerializeObject(new { roles = rolesAsIds.ToArray() });

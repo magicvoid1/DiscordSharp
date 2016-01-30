@@ -19,6 +19,7 @@ namespace DiscordSharpTestApplication
     {
         static DiscordClient client = new DiscordClient();
         static WaitHandle waitHandle = new AutoResetEvent(false);
+        static LastAuth lastfmAuthentication = new LastAuth("4de0532fe30150ee7a553e160fbbe0e0", "0686c5e41f20d2dc80b64958f2df0f0c");
 
         static void WriteDebug(LogMessage m, string prefix)
         {
@@ -50,6 +51,9 @@ namespace DiscordSharpTestApplication
         {
             Console.WriteLine("\t\t\tDiscordSharp Tester");
             client.ClientPrivateInformation = new DiscordUserInformation();
+#if DEBUG
+            client.WriteLatestReady = true;
+#endif
 
             if (File.Exists("credentials.txt"))
             {
@@ -81,10 +85,10 @@ namespace DiscordSharpTestApplication
                         WriteDebug(e.message, "Text Client");
                         if (client.GetServersList() != null)
                         {
-                            DiscordMember onwer = client.GetServersList().Find(x => x.members.Find(y => y.user.username == "Axiom") != null).members.Find(x => x.user.username == "Axiom");
+                            DiscordMember onwer = client.GetServersList().Find(x => x.members.Find(y => y.Username == "Axiom") != null).members.Find(x => x.Username == "Axiom");
                             if (onwer != null)
                                 if(!e.message.Message.Contains("Setting current game"))
-                                    onwer.user.SendMessage($"**LOGGING**\n```\n[Text Client: {e.message.Level}]: {e.message.Message}\n```");
+                                    onwer.SendMessage($"**LOGGING**\n```\n[Text Client: {e.message.Level}]: {e.message.Message}\n```");
                         }
                     }
                 };
@@ -102,11 +106,11 @@ namespace DiscordSharpTestApplication
                     {
                         sw.WriteLine(e.RawJson);
                     }
-                    client.SendMessageToUser("Heya, a new message type, '" + e.RawJson["t"].ToString() + "', has popped up!", client.GetServersList().Find(x => x.members.Find(y => y.user.username == "Axiom") != null).members.Find(x => x.user.username == "Axiom"));
+                    client.SendMessageToUser("Heya, a new message type, '" + e.RawJson["t"].ToString() + "', has popped up!", client.GetServersList().Find(x => x.members.Find(y => y.Username == "Axiom") != null).members.Find(x => x.Username == "Axiom"));
                 };
                 client.VoiceStateUpdate += (sender, e) =>
                 {
-                    Console.WriteLine("***Voice State Update*** User: " + e.user.user.username);
+                    Console.WriteLine("***Voice State Update*** User: " + e.user.Username);
                 };
                 client.GuildCreated += (sender, e) =>
                 {
@@ -114,6 +118,7 @@ namespace DiscordSharpTestApplication
                 };
                 client.MessageEdited += (sender, e) =>
                 {
+                    Console.WriteLine(e.message);
                     //if (e.author.user.username == "Axiom")
                     //    client.SendMessageToChannel("What the fuck, <@" + e.author.user.id + "> you can't event type your message right. (\"" + e.MessageEdited.content + "\")", e.Channel);
                 };
@@ -123,9 +128,13 @@ namespace DiscordSharpTestApplication
                     if (parentServer != null)
                         Console.WriteLine("Channel {0} created in {1}!", e.ChannelCreated.name, parentServer.name);
                 };
+                client.PrivateChannelDeleted += (sender, e) =>
+                {
+                    Console.WriteLine("Private channel deleted with " + e.PrivateChannelDeleted.recipient.Username);
+                };
                 client.PrivateChannelCreated += (sender, e) =>
                 {
-                    Console.WriteLine("Private channel started with {0}", e.ChannelCreated.recipient.username);
+                    Console.WriteLine("Private channel started with {0}", e.ChannelCreated.recipient.Username);
                 };
                 client.PrivateMessageReceived += (sender, e) =>
                 {
@@ -134,17 +143,17 @@ namespace DiscordSharpTestApplication
                 client.MentionReceived += (sender, e) =>
                 {
                     string rawMessage = e.message.content;
-                    string whatToSend = $"I received a mention from @{e.author.user.username} in #{e.Channel.name} in {e.Channel.parent.name}. It said: \n```\n{rawMessage}\n```";
-                    if (rawMessage.Contains($"{client.Me.user.id}"))
-                        whatToSend += $"Where `<@{client.Me.user.id}>` is my user being mentioned.";
-                    DiscordMember owner = client.GetServersList().Find(x => x.members.Find(y => y.user.username == "Axiom") != null).members.Find(x => x.user.username == "Axiom");
+                    string whatToSend = $"I received a mention from @{e.author.Username} in #{e.Channel.name} in {e.Channel.parent.name}. It said: \n```\n{rawMessage}\n```";
+                    if (rawMessage.Contains($"{client.Me.ID}"))
+                        whatToSend += $"Where `<@{client.Me.ID}>` is my user being mentioned.";
+                    DiscordMember owner = client.GetServersList().Find(x => x.members.Find(y => y.Username == "Axiom") != null).members.Find(x => x.Username == "Axiom");
                     client.SendMessageToUser(whatToSend, owner);
                 };
                 client.MessageReceived += (sender, e) =>
                 {
                 DiscordServer fromServer = client.GetServersList().Find(x => x.channels.Find(y => y.id == e.Channel.id) != null);
 
-                Console.WriteLine("[- Message from {0} in {1} on {2}: {3}", e.author.user.username, e.Channel.name, fromServer.name, e.message.content);
+                Console.WriteLine("[- Message from {0} in {1} on {2}: {3}", e.author.Username, e.Channel.name, fromServer.name, e.message.content);
 
                 if (e.message.content.StartsWith("?status"))
                     client.SendMessageToChannel("I work ;)", e.Channel);
@@ -166,7 +175,7 @@ namespace DiscordSharpTestApplication
                 }
                 else if(e.message.content.StartsWith("?testjoinvoice"))
                     {
-                        if (e.author.user.username != "Axiom")
+                        if (e.author.Username != "Axiom")
                             return;
                         string[] split = e.message.content.Split(new char[] { ' ' }, 2);
                         if(split.Length > 1)
@@ -201,17 +210,17 @@ namespace DiscordSharpTestApplication
                     DiscordServer server = client.GetServersList().Find(x => x.channels.Find(y => y.id == e.Channel.id) != null);
                     string owner = "";
                     foreach (var member in server.members)
-                        if (member.user.id == server.owner.user.id)
-                            owner = member.user.username;
+                        if (member.ID == server.owner.ID)
+                            owner = member.Username;
                     string whereami = String.Format("I am currently in *#{0}* ({1}) on server *{2}* ({3}) owned by @{4}. The channel's topic is: {5}", e.Channel.name, e.Channel.id, server.name, server.id, owner, e.Channel.topic);
                     client.SendMessageToChannel(whereami, e.Channel);
                 }
                 else if (e.message.content.StartsWith("?makeroll"))
                 {
-                    DiscordMember me = e.Channel.parent.members.Find(x => x.user.id == client.Me.user.id);
+                    DiscordMember me = e.Channel.parent.members.Find(x => x.ID == client.Me.ID);
                     DiscordServer inServer = e.Channel.parent;
 
-                    foreach (var role in me.roles)
+                    foreach (var role in me.Roles)
                     {
                         if (role.permissions.HasPermission(DiscordSpecialPermissions.ManageRoles))
                         {
@@ -237,18 +246,18 @@ namespace DiscordSharpTestApplication
                         Regex r = new Regex(@"(?<=<)([^>]+)(?=>)");
                         string userToGetRoles = r.Match(split[1]).Value;
                         userToGetRoles = userToGetRoles.Trim('@'); //lol
-                        DiscordMember foundMember = e.Channel.parent.members.Find(x => x.user.id == userToGetRoles);
+                        DiscordMember foundMember = e.Channel.parent.members.Find(x => x.ID == userToGetRoles);
                         if (foundMember != null)
                         {
-                            string whatToSend = "Found roles for user **" + foundMember.user.username + "**:\n```";
-                            for (int i = 0; i < foundMember.roles.Count; i++)
+                            string whatToSend = "Found roles for user **" + foundMember.Username + "**:\n```";
+                            for (int i = 0; i < foundMember.Roles.Count; i++)
                             {
                                 if (i > 0)
                                     whatToSend += "\n";
-                                whatToSend += $"* {foundMember.roles[i].name}: id={foundMember.roles[i].id} color=0x{foundMember.roles[i].color.ToString()}, (R: {foundMember.roles[i].color.R} G: {foundMember.roles[i].color.G} B: {foundMember.roles[i].color.B}) permissions={foundMember.roles[i].permissions.GetRawPermissions()}";
+                                whatToSend += $"* {foundMember.Roles[i].name}: id={foundMember.Roles[i].id} color=0x{foundMember.Roles[i].color.ToString()}, (R: {foundMember.Roles[i].color.R} G: {foundMember.Roles[i].color.G} B: {foundMember.Roles[i].color.B}) permissions={foundMember.Roles[i].permissions.GetRawPermissions()}";
 
                                 string tempPermissions = "";
-                                foreach (var permissions in foundMember.roles[i].permissions.GetAllPermissions())
+                                foreach (var permissions in foundMember.Roles[i].permissions.GetAllPermissions())
                                 {
                                     tempPermissions += " " + permissions.ToString();
                                 }
@@ -295,22 +304,22 @@ namespace DiscordSharpTestApplication
                 }
                 else if (e.message.content.StartsWith("?everyone"))
                 {
-                    DiscordServer server = client.GetServersList().Find(x => x.channels.Find(y => y.id == e.Channel.id) != null);
-                    string[] split = e.message.content.Split(new char[] { ' ' }, 2);
-                    if (split.Length > 1)
-                    {
-                        string message = "";
-                        foreach (var user in server.members)
-                        {
-                            if (user.user.id == client.Me.user.id)
-                                continue;
-                            if (user.user.username == "Blank")
-                                continue;
-                            message += "@" + user.user.username + " ";
-                        }
-                        message += ": " + split[1];
-                        client.SendMessageToChannel(message, e.Channel);
-                    }
+                    //DiscordServer server = client.GetServersList().Find(x => x.channels.Find(y => y.id == e.Channel.id) != null);
+                    //string[] split = e.message.content.Split(new char[] { ' ' }, 2);
+                    //if (split.Length > 1)
+                    //{
+                    //    string message = "";
+                    //    foreach (var user in server.members)
+                    //    {
+                    //        if (user.ID == client.Me.ID)
+                    //            continue;
+                    //        if (user.user.username == "Blank")
+                    //            continue;
+                    //        message += "@" + user.user.username + " ";
+                    //    }
+                    //    message += ": " + split[1];
+                    //    client.SendMessageToChannel(message, e.Channel);
+                    //}
                 }
                 else if (e.message.content.StartsWith("?lastfm"))
                 {
@@ -320,19 +329,19 @@ namespace DiscordSharpTestApplication
                     string[] split = e.message.content.Split(new char[] { ' ' }, 2);
                     if (split.Length > 1)
                     {
-                        using (var lllfclient = new LastfmClient("4de0532fe30150ee7a553e160fbbe0e0", "0686c5e41f20d2dc80b64958f2df0f0c", null, null))
-                        {
-                            try
+                            using (var lllfclient = new LastfmClient(lastfmAuthentication))
                             {
-                                var recentScrobbles = lllfclient.User.GetRecentScrobbles(split[1], null, 1, 1);
-                                LastTrack lastTrack = recentScrobbles.Result.Content[0];
-                                client.SendMessageToChannel(string.Format("*{0}* last listened to _{1}_ by _{2}_", split[1], lastTrack.Name, lastTrack.ArtistName), e.Channel);
+                                try
+                                {
+                                    var recentScrobbles = lllfclient.User.GetRecentScrobbles(split[1], null, 1, 1);
+                                    LastTrack lastTrack = recentScrobbles.Result.Content[0];
+                                    client.SendMessageToChannel(string.Format("*{0}* last listened to _{1}_ by _{2}_", split[1], lastTrack.Name, lastTrack.ArtistName), e.Channel);
+                                }
+                                catch
+                                {
+                                    client.SendMessageToChannel(string.Format("User _*{0}*_ not found!", split[1]), e.Channel);
+                                }
                             }
-                            catch
-                            {
-                                client.SendMessageToChannel(string.Format("User _*{0}*_ not found!", split[1]), e.Channel);
-                            }
-                        }
                     }
                     else
                         client.SendMessageToChannel("Who??", e.Channel);
@@ -341,10 +350,10 @@ namespace DiscordSharpTestApplication
                 else if (e.message.content.StartsWith("?assignrole"))
                 {
                     DiscordServer server = e.Channel.parent;
-                    DiscordMember me = server.members.Find(x => x.user.id == client.Me.user.id);
+                    DiscordMember me = server.members.Find(x => x.ID == client.Me.ID);
 
                     bool hasPermission = false;
-                    me.roles.ForEach(r =>
+                    me.Roles.ForEach(r =>
                     {
                         if (r.permissions.HasPermission(DiscordSpecialPermissions.ManageRoles))
                             hasPermission = true;
@@ -357,7 +366,7 @@ namespace DiscordSharpTestApplication
                             DiscordRole toAssign = server.roles.Find(x => x.name.ToLower().Trim() == split[1].ToLower().Trim());
                             if (toAssign != null)
                             {
-                                client.AssignRoleToMember(server, toAssign, server.members.Find(x => x.user.username == "Axiom"));
+                                client.AssignRoleToMember(server, toAssign, server.members.Find(x => x.Username == "Axiom"));
                             }
                             else
                             {
@@ -408,8 +417,8 @@ namespace DiscordSharpTestApplication
                 else if (e.message.content.StartsWith("?changeguildpic"))
                 {
                     DiscordServer current = e.Channel.parent;
-                    DiscordMember me = current.members.Find(x => x.user.id == client.Me.user.id);
-                    foreach (var role in me.roles)
+                    DiscordMember me = current.members.Find(x => x.ID == client.Me.ID);
+                    foreach (var role in me.Roles)
                     {
                         if (role.permissions.HasPermission(DiscordSpecialPermissions.ManageServer))
                         {
@@ -448,10 +457,20 @@ namespace DiscordSharpTestApplication
                     var foundServer = client.GetServersList().Find(x => x.channels.Find(y => y.id == e.Channel.id) != null);
                     if (foundServer != null)
                     {
-                        var foundMember = foundServer.members.Find(x => x.user.id == m.Value);
-                        client.SendMessageToChannel(string.Format("<@{0}>: {1}, {2}", foundMember.user.id, foundMember.user.id, foundMember.user.username), e.Channel);
+                        var foundMember = foundServer.members.Find(x => x.ID == m.Value);
+                        client.SendMessageToChannel(string.Format("<@{0}>: {1}, {2}", foundMember.ID, foundMember.ID, foundMember.Username), e.Channel);
                     }
                 }
+                else if(e.message.content.StartsWith("?deletelast"))
+                    {
+                        //client.DeleteMessage(client.GetLastMessageSent(e.Channel).id);
+
+                    }
+                else if(e.message.content.StartsWith("?testdmdelete"))
+                    {
+                        var msg = client.SendMessageToUser("test", client.GetServersList()[0].members.Find(x => x.Username == "Axiom"));
+                        client.DeletePrivateMessage(msg);
+                    }
                 else if (e.message.content.StartsWith("?prune"))
                 {
                     string[] split = e.message.content.Split(new char[] { ' ' }, 2);
@@ -491,7 +510,7 @@ namespace DiscordSharpTestApplication
                     client.SendMessageToChannel("Luigibot does what Reta don't.", e.Channel);
                 else if (e.message.content.StartsWith("?selfdestruct"))
                 {
-                    if (e.author.user.username == "Axiom")
+                    if (e.author.Username == "Axiom")
                         client.SendMessageToChannel("restaroni in pepparoni", e.Channel);
                     Environment.Exit(0);
                 }
@@ -503,7 +522,7 @@ namespace DiscordSharpTestApplication
                     {
                         toSend += $"* Type: {over.type}\n";
                         if (over.type == DiscordPermissionOverride.OverrideType.member)
-                            toSend += $"  Member: {over.id} ({channel.parent.members.Find(x => x.user.id == over.id).user.username})\n";
+                            toSend += $"  Member: {over.id} ({channel.parent.members.Find(x => x.ID == over.id).Username})\n";
                         else
                             toSend += $"  Role: {over.id} ({channel.parent.roles.Find(x => x.id == over.id).name})\n";
                         toSend += $" Allowed: {over.GetAllowedRawPermissions()}\n";
@@ -525,7 +544,7 @@ namespace DiscordSharpTestApplication
                 }
                 else if (e.message.content.StartsWith("?createchannel"))
                 {
-                    if (e.author.user.username == "Axiom")
+                    if (e.author.Username == "Axiom")
                     {
                         string[] split = e.message.content.Split(new char[] { ' ' }, 2);
                         if (split.Length > 0)
@@ -536,14 +555,14 @@ namespace DiscordSharpTestApplication
                 }
                 else if (e.message.content.StartsWith("?deletechannel"))
                 {
-                    if (e.author.user.username == "Axiom")
+                    if (e.author.Username == "Axiom")
                     {
                         client.DeleteChannel(e.Channel);
                     }
                 }
                 else if (e.message.content.StartsWith("?changetopic"))
                 {
-                    if (e.author.user.username == "Axiom")
+                    if (e.author.Username == "Axiom")
                     {
                         string[] split = e.message.content.Split(new char[] { ' ' }, 2);
                         if (split.Length > 0)
@@ -552,7 +571,7 @@ namespace DiscordSharpTestApplication
                 }
                 else if (e.message.content.StartsWith("?join"))
                 {
-                    if (e.author.user.username == "Axiom")
+                    if (e.author.Username == "Axiom")
                     {
                         string[] split = e.message.content.Split(new char[] { ' ' }, 2);
                         if (split.Length > 0)
@@ -565,8 +584,8 @@ namespace DiscordSharpTestApplication
                 }
                 else if (e.message.content.StartsWith("?playing"))
                 {
-                    DiscordMember member = e.Channel.parent.members.Find(x => x.user.username == "Axiom");
-                    using (var lllfclient = new LastfmClient("4de0532fe30150ee7a553e160fbbe0e0", "0686c5e41f20d2dc80b64958f2df0f0c", null, null))
+                    DiscordMember member = e.Channel.parent.members.Find(x => x.Username == "Axiom");
+                    using (var lllfclient = new LastfmClient(lastfmAuthentication))
                     {
                             try
                             {
@@ -577,12 +596,12 @@ namespace DiscordSharpTestApplication
                                 {
                                     var localTime = lastTrack.TimePlayed.Value.DateTime.ToLocalTime();
                                     if (DateTime.Now.Subtract(localTime) > (lastTrack.Duration == null ? new TimeSpan(0, 10, 0) : lastTrack.Duration))
-                                        e.Channel.SendMessage($"<@{member.user.id}> last played: **{lastTrack.Name}** by *{lastTrack.ArtistName}*. It was scrobbled at: {localTime} EST (-5).");
+                                        e.Channel.SendMessage($"<@{member.ID}> last played: **{lastTrack.Name}** by *{lastTrack.ArtistName}*. It was scrobbled at: {localTime} EST (-5).");
                                     else
-                                        e.Channel.SendMessage($"<@{member.user.id}> is now playing: **{lastTrack.Name}** by *{lastTrack.ArtistName}*.");
+                                        e.Channel.SendMessage($"<@{member.ID}> is now playing: **{lastTrack.Name}** by *{lastTrack.ArtistName}*.");
                                 }
                                 else
-                                    e.Channel.SendMessage($"<@{member.user.id}> is now playing: **{lastTrack.Name}** by *{lastTrack.ArtistName}*.");
+                                    e.Channel.SendMessage($"<@{member.ID}> is now playing: **{lastTrack.Name}** by *{lastTrack.ArtistName}*.");
 
                                 if (e.message.content.Contains("art"))
                                 {
@@ -602,7 +621,7 @@ namespace DiscordSharpTestApplication
                             catch (Exception ex)
                             {
                                 string whatToSend = $"Couldn't get Last.fm recent scrobbles for you! Exception:\n```{ex.Message}\n{ex.StackTrace}\n```\n";
-                                client.SendMessageToUser(whatToSend, client.GetServersList().Find(x => x.members.Find(y => y.user.username == "Axiom") != null).members.Find(x => x.user.username == "Axiom"));
+                                client.SendMessageToUser(whatToSend, client.GetServersList().Find(x => x.members.Find(y => y.Username == "Axiom") != null).members.Find(x => x.Username == "Axiom"));
                             }
                         }
                     }
@@ -610,18 +629,17 @@ namespace DiscordSharpTestApplication
                 
                 client.Connected += (sender, e) =>
                 {
-                    Console.WriteLine("Connected! User: " + e.user.user.username);
+                    Console.WriteLine("Connected! User: " + e.user.Username);
                     using (var sw = new StreamWriter("credentials.txt"))
                     {
                         sw.WriteLine(client.ClientPrivateInformation.email);
                         sw.WriteLine(client.ClientPrivateInformation.password);
                         sw.Flush();
                     }
-                    using (var lllfclient = new LastfmClient("4de0532fe30150ee7a553e160fbbe0e0", "0686c5e41f20d2dc80b64958f2df0f0c", null, null))
+                    using (var lllfclient = new LastfmClient(lastfmAuthentication))
                     {
                         try
                         {
-
                             var recentScrobbles = lllfclient.User.GetRecentScrobbles("mrmiketheripper", null, 1, 1);
                             LastTrack lastTrack = recentScrobbles.Result.Content[0];
                             string newGame = $"{lastTrack.Name} by {lastTrack.ArtistName}";
@@ -631,7 +649,7 @@ namespace DiscordSharpTestApplication
                         catch (Exception ex)
                         {
                             string whatToSend = $"Couldn't get Last.fm recent scrobbles for you! Exception:\n```{ex.Message}\n{ex.StackTrace}\n```\n";
-                            client.SendMessageToUser(whatToSend, client.GetServersList().Find(x => x.members.Find(y => y.user.username == "Axiom") != null).members.Find(x => x.user.username == "Axiom"));
+                            client.SendMessageToUser(whatToSend, client.GetServersList().Find(x => x.members.Find(y => y.Username == "Axiom") != null).members.Find(x => x.Username == "Axiom"));
                         }
                     }
                 };
@@ -657,7 +675,7 @@ namespace DiscordSharpTestApplication
             System.Timers.Timer lastfmUpdateTimer = new System.Timers.Timer(25 * 1000); //check last.fm every 25 seconds
             lastfmUpdateTimer.Elapsed += (sender, e) =>
             {
-                using (var lllfclient = new LastfmClient("4de0532fe30150ee7a553e160fbbe0e0", "0686c5e41f20d2dc80b64958f2df0f0c", null, null))
+                using (var lllfclient = new LastfmClient(lastfmAuthentication))
                 {
                     try
                     {
@@ -684,7 +702,7 @@ namespace DiscordSharpTestApplication
                     catch(Exception ex)
                     {
                         string whatToSend = $"Couldn't get Last.fm recent scrobbles for you! Exception:\n```{ex.Message}\n{ex.StackTrace}\n```\n";
-                        client.SendMessageToUser(whatToSend, client.GetServersList().Find(x => x.members.Find(y => y.user.username == "Axiom") != null).members.Find(x => x.user.username == "Axiom"));
+                        client.SendMessageToUser(whatToSend, client.GetServersList().Find(x => x.members.Find(y => y.Username == "Axiom") != null).members.Find(x => x.Username == "Axiom"));
                     }
                 }
             };
@@ -762,7 +780,6 @@ namespace DiscordSharpTestApplication
                         DiscordVoiceClient vc = client.GetVoiceClient();
                         if (vc != null)
                         {
-                            vc.SendWav(ofd.FileName);
                         }
                     }
                 }
@@ -787,7 +804,9 @@ namespace DiscordSharpTestApplication
                 {
                     DiscordMessage msg = client.GetLastMessageSent();
                     Console.WriteLine("--Last Message Sent--");
-                    Console.WriteLine($"  ID: {msg.id}\n  Channel: {msg.channel.name}\n  Content: {msg.content}");
+
+                    DiscordChannel channel = Convert.ChangeType(msg.Channel(), typeof(DiscordChannel));
+                    Console.WriteLine($"  ID: {msg.id}\n  Channel: {channel.name}\n  Content: {msg.content}");
                 }
             } while (!string.IsNullOrWhiteSpace(input));
         }
