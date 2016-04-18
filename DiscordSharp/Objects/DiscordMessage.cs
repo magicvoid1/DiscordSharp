@@ -6,8 +6,24 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DiscordSharp
+namespace DiscordSharp.Objects
 {
+    public struct DiscordAttachment
+    {
+        [JsonProperty("width")]
+        public int Width { get; internal set; }
+        [JsonProperty("height")]
+        public int Height { get; internal set; }
+        [JsonProperty("size")]
+        public int Size { get; internal set; }
+        [JsonProperty("filename")]
+        public string Filename { get; internal set; }
+        [JsonProperty("proxy_url")]
+        public string ProxyURL { get; internal set; }
+        [JsonProperty("url")]
+        public string URL { get; internal set; }
+    }
+
     /// <summary>
     /// Message to be sent
     /// </summary>
@@ -22,7 +38,7 @@ namespace DiscordSharp
         public string[] mentions { get; internal set; }
 
         [JsonProperty("attachments")]
-        public string[] attachments { get; internal set; }
+        public DiscordAttachment[] attachments { get; internal set; }
 
 
         //public string recipient_id { get; set; }
@@ -33,11 +49,14 @@ namespace DiscordSharp
         public Type TypeOfChannelObject { get; internal set; }
 
         public dynamic Channel() =>
-            Convert.ChangeType(this, TypeOfChannelObject);
+            Convert.ChangeType(this.channel, TypeOfChannelObject);
 
         [JsonProperty("timestamp")]
         public DateTime timestamp { get; internal set; }
 
         public JObject RawJson { get; internal set; }
+
+
+        internal DiscordMessage() { }
     }
 }

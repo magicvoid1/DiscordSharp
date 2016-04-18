@@ -4,7 +4,7 @@ using System.IO;
 
 namespace DiscordSharp
 {
-    public struct LoggerMessageReceivedArgs
+	public class LoggerMessageReceivedArgs : EventArgs
     {
         public LogMessage message;
     }
@@ -22,7 +22,8 @@ namespace DiscordSharp
         Critical = 0x0,
         Debug = 0x1,
         Warning = 0x2,
-        Error = 0x3
+        Error = 0x3,
+        Unecessary = 0x4 //for the reallllllly annoying messages
     }
 
     public delegate void OnLogMessageReceived(object sender, LoggerMessageReceivedArgs e);
@@ -90,6 +91,16 @@ namespace DiscordSharp
         }
 
         public void Log(string message, MessageLevel level)
+        {
+            LogMessage m = new LogMessage();
+            m.Message = message;
+            m.Level = level;
+            m.TimeStamp = DateTime.Now;
+
+            pushLog(m);
+        }
+
+        public async void LogAsync(string message, MessageLevel level)
         {
             LogMessage m = new LogMessage();
             m.Message = message;

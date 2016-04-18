@@ -5,8 +5,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DiscordSharp
+namespace DiscordSharp.Objects
 {
+    [Obsolete]
     public class DiscordLoginInformation
     {
         public string[] email { get; set; }

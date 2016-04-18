@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using DiscordSharp.Objects;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -7,7 +8,7 @@ namespace DiscordSharp
 {
     internal class Utils
     {
-        public static byte[] ImageToByteArray(Image img)
+        internal static byte[] ImageToByteArray(Image img)
         {
             byte[] byteArray = new byte[0];
             using (MemoryStream stream = new MemoryStream())
@@ -20,7 +21,7 @@ namespace DiscordSharp
             return byteArray;
         }
 
-        public static DiscordMessage GenerateMessage(string message)
+        internal static DiscordMessage GenerateMessage(string message)
         {
             //DiscordMessage dm = new DiscordMessage();
             ///Temporarily disabling this

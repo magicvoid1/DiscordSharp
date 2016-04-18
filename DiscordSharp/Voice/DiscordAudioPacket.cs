@@ -7,11 +7,9 @@ using System.Threading.Tasks;
 
 namespace DiscordSharp
 {
-    class DiscordAudioPacket
+    public class DiscordAudioPacket
     {
         //ty to JDA developer DV8 for documentating this in his library
-
-
         public static int RTP_HEADER_BYTE_LENGTH = 12;
 
         /**
@@ -25,10 +23,10 @@ namespace DiscordSharp
         public static byte RTP_VERSION_PAD_EXTEND = (byte)0x80;  //Binary: 1000 0000
         public static byte RTP_PAYLOAD_TYPE = (byte)0x78;        //Binary: 0100 1000
 
-        public static int RTP_VERSION_PAD_EXTEND_INDEX = 0;
-        public static int RTP_PAYLOAD_INDEX = 1;
-        public static int SEQ_INDEX = 2;
-        public static int TIMESTAMP_INDEX = 4;
+        public static short RTP_VERSION_PAD_EXTEND_INDEX = 0;
+        public static short RTP_PAYLOAD_INDEX = 1;
+        public static short SEQ_INDEX = 2;
+        public static short TIMESTAMP_INDEX = 4;
         public static int SSRC_INDEX = 8;
 
         private byte seq;
@@ -36,6 +34,10 @@ namespace DiscordSharp
         private int ssrc;
         private byte[] encodedAudio;
         private byte[] rawPacket;
+
+        public byte Seq => seq;
+        public int Timestamp => timestamp;
+        public int SSRC => ssrc;
 
         public DiscordAudioPacket(byte[] raw)
         {
@@ -56,6 +58,7 @@ namespace DiscordSharp
 
                     byte[] audio = new byte[rawPacket.Length - RTP_HEADER_BYTE_LENGTH];
                     Array.Copy(rawPacket, RTP_HEADER_BYTE_LENGTH, audio, 0, audio.Length);
+                    encodedAudio = audio;
                 }
             }
         }
@@ -68,35 +71,56 @@ namespace DiscordSharp
             this.encodedAudio = encodedaudio;
 
             byte[] fullPacket = new byte[RTP_HEADER_BYTE_LENGTH + encodedAudio.Length];
-            using (MemoryStream ms = new MemoryStream(fullPacket))
+            using (MemoryStream ms = new MemoryStream())
             {
                 using (BinaryWriter writer = new BinaryWriter(ms))
                 {
                     writer.BaseStream.Position = RTP_VERSION_PAD_EXTEND_INDEX;
-                    writer.Write(RTP_VERSION_PAD_EXTEND);
+                    writer.Write((byte)((RTP_VERSION_PAD_EXTEND >> 8) & 0xFF));
+                    writer.Write((byte)((RTP_VERSION_PAD_EXTEND >> 0) & 0xFF));
 
                     writer.BaseStream.Position = RTP_PAYLOAD_INDEX;
-                    writer.Write(RTP_PAYLOAD_TYPE);
+                    writer.Write((byte)((RTP_PAYLOAD_TYPE >> 8) & 0xFF));
+                    writer.Write((byte)((RTP_PAYLOAD_TYPE >> 0) & 0xFF));
 
                     writer.BaseStream.Position = SEQ_INDEX;
-                    writer.Write(seq);
+                    writer.Write((byte)seq);
 
                     writer.BaseStream.Position = TIMESTAMP_INDEX;
-                    writer.Write(timestamp);
+                    writer.Write((byte)((timestamp >> 24) & 0xFF));
+                    writer.Write((byte)((timestamp >> 16) & 0xFF));
+                    writer.Write((byte)((timestamp >> 8) & 0xFF));
+                    writer.Write((byte)((timestamp >> 0) & 0xFF));
 
                     writer.BaseStream.Position = SSRC_INDEX;
-                    writer.Write(ssrc);
+                    writer.Write(IntToBytes(ssrc));
 
                     writer.BaseStream.Position = RTP_HEADER_BYTE_LENGTH;
-                    writer.Write(fullPacket);
+                    writer.Write(encodedAudio);
                 }
             }
+            rawPacket = fullPacket;
+        }
+
+        //int is 4
+        internal static byte[] IntToBytes(int i)
+        {
+            byte[] buffer = new byte[4];
+
+            buffer[0] = (byte)((i >> 24) & 0xFF);
+            buffer[1] = (byte)((i >> 16) & 0xFF);
+            buffer[2] = (byte)((i >> 8) & 0xFF);
+            buffer[3] = (byte)((i >> 0) & 0xFF);
+
+            return buffer;
         }
 
         public byte[] AsRawPacket()
         {
             return rawPacket;
         }
+
+        public byte[] GetEncodedAudio() => encodedAudio;
 
         public static DiscordAudioPacket EchoPacket(byte[] packet, int ssrc)
         {
@@ -111,7 +135,7 @@ namespace DiscordSharp
                     writer.Write(RTP_PAYLOAD_TYPE);
 
                     writer.BaseStream.Position = SSRC_INDEX;
-                    writer.Write(ssrc);
+                    writer.Write(IntToBytes(ssrc));
 
                     //writer.BaseStream.Position = SSRC_INDEX + sizeof(int);
                     //writer.Write(packet);
